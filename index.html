@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f14">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Field Service Assistant</title>
+<style>
+:root{
+  --bg:#0b0f14; --panel:#121820; --panel2:#18212b; --line:#243040;
+  --text:#d9e2ec; --muted:#7f8fa3; --accent:#ffb000; --accent2:#2dd4bf;
+  --danger:#ff5c5c; --ok:#3ddc84;
+  --mono: ui-monospace, "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:var(--sans)}
+body{display:flex;flex-direction:column;overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer}
+input,textarea,select{font:inherit;color:var(--text)}
+
+/* splash */
+#splash{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:14px;transition:opacity .5s}
+#splash.hide{opacity:0;pointer-events:none}
+#splash .logo{width:96px;height:96px;object-fit:contain}
+#splash .name{font-family:var(--mono);font-size:20px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent)}
+#splash .sub{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.12em}
+#splash .bar{width:160px;height:3px;background:var(--line);margin-top:10px;overflow:hidden;border-radius:2px}
+#splash .bar i{display:block;height:100%;width:40%;background:var(--accent);animation:load 1.1s infinite ease-in-out}
+@keyframes load{0%{margin-left:-40%}100%{margin-left:100%}}
+
+/* header */
+header{padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;background:var(--panel);
+  border-bottom:2px solid var(--accent);display:flex;align-items:center;gap:10px}
+header .logo{width:36px;height:36px;object-fit:contain;border-radius:6px;background:#0000}
+header .titles{flex:1;min-width:0}
+header .title{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header .sub{font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);display:inline-block}
+.dot.off{background:var(--danger)}
+.iconbtn{background:var(--panel2);border:1px solid var(--line);border-radius:8px;width:38px;height:38px;
+  display:grid;place-items:center;font-size:18px}
+.iconbtn:active{background:var(--line)}
+
+/* machine bar */
+.machinebar{display:flex;gap:8px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+.machinebar label{flex:1;display:flex;flex-direction:column;gap:2px;font-family:var(--mono);font-size:10px;
+  letter-spacing:.1em;color:var(--muted);text-transform:uppercase}
+.machinebar input{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 8px;
+  font-family:var(--mono);font-size:14px;color:var(--accent2);width:100%;text-transform:uppercase}
+.machinebar input:focus,.composer textarea:focus,.field input:focus{outline:1px solid var(--accent);border-color:var(--accent)}
+
+/* quick actions */
+.quick{display:flex;gap:8px;padding:8px 12px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--line)}
+.quick::-webkit-scrollbar{display:none}
+.quick button{flex:0 0 auto;background:var(--panel2);border:1px solid var(--line);border-radius:999px;
+  padding:8px 14px;font-family:var(--mono);font-size:12px;letter-spacing:.04em;white-space:nowrap}
+.quick button:active{border-color:var(--accent);color:var(--accent)}
+
+/* chat */
+#chat{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth}
+.empty{margin:auto;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px;line-height:1.7;padding:20px}
+.empty b{display:block;color:var(--accent);font-size:13px;letter-spacing:.14em;margin-bottom:6px}
+.msg{max-width:92%;display:flex;flex-direction:column;gap:6px}
+.msg.user{align-self:flex-end}
+.msg.user .bubble{background:#1d2a38;border:1px solid var(--line);border-radius:12px 12px 2px 12px;padding:10px 12px;white-space:pre-wrap;word-break:break-word}
+.msg.user .imgs{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.msg.user img{width:96px;height:96px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.msg.ai{align-self:stretch;max-width:100%}
+.card{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:10px 12px}
+.card h4{margin:0 0 6px;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.card.warn{border-left-color:var(--danger)} .card.warn h4{color:var(--danger)}
+.card.parts{border-left-color:var(--accent2)} .card.parts h4{color:var(--accent2)}
+.card p{margin:4px 0;line-height:1.5;font-size:14.5px}
+.card ul,.card ol{margin:4px 0;padding-left:20px;font-size:14.5px;line-height:1.5}
+.card li{margin:3px 0}
+code,.code{font-family:var(--mono);background:#0b1118;border:1px solid var(--line);border-radius:4px;padding:1px 5px;
+  color:var(--accent2);font-size:.92em;white-space:nowrap}
+.disclaimer{font-family:var(--mono);font-size:10.5px;color:var(--muted);letter-spacing:.04em}
+.typing{font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:8px;align-items:center}
+.typing i{width:8px;height:8px;background:var(--accent);border-radius:50%;animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.2}}
+.errorbox{background:#2a1214;border:1px solid var(--danger);border-radius:8px;padding:10px 12px;font-size:14px}
+
+/* composer */
+.composer{padding:8px 10px calc(env(safe-area-inset-bottom) + 8px);background:var(--panel);border-top:1px solid var(--line)}
+#thumbs{display:flex;gap:8px;padding:0 2px 8px;overflow-x:auto}
+#thumbs .t{position:relative;flex:0 0 auto}
+#thumbs img{width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--accent)}
+#thumbs button{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;
+  background:var(--danger);color:#fff;font-size:12px;line-height:1;padding:0}
+.row{display:flex;gap:8px;align-items:flex-end}
+.composer textarea{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+  resize:none;max-height:120px;min-height:42px;line-height:1.35}
+.send{background:var(--accent);color:#1a1200;border:none;border-radius:10px;width:46px;height:42px;font-weight:700;font-size:18px}
+.send:disabled{opacity:.4}
+.hidden{display:none!important}
+
+/* panels */
+.panel{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .22s}
+.panel.open{transform:none}
+.panel header{border-bottom:2px solid var(--accent)}
+.panel .body{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+.sess{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;gap:10px;align-items:center}
+.sess .info{flex:1;min-width:0}
+.sess .t{font-family:var(--mono);font-size:13px;color:var(--accent2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sess .s{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.sess .d{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:2px}
+.sess .del{background:none;border:1px solid var(--line);border-radius:8px;padding:6px 9px;color:var(--danger)}
+.search{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase}
+.field input{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.field small{color:var(--muted);font-size:12px;line-height:1.4}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px 14px;font-weight:600}
+.btn.primary{background:var(--accent);color:#1a1200;border-color:var(--accent)}
+.btn.danger{color:var(--danger)}
+</style>
+</head>
+<body>
+
+<div id="splash">
+  <img class="logo" id="splashLogo" alt="">
+  <div class="name" id="splashName"></div>
+  <div class="sub" id="splashSub"></div>
+  <div class="bar"><i></i></div>
+</div>
+
+<header>
+  <img class="logo" id="hdrLogo" alt="">
+  <div class="titles">
+    <div class="title" id="hdrTitle"></div>
+    <div class="sub"><span class="dot off" id="statusDot"></span><span id="statusText">NO API KEY</span></div>
+  </div>
+  <button class="iconbtn" id="btnNew" title="New session">＋</button>
+  <button class="iconbtn" id="btnHist" title="History">☰</button>
+  <button class="iconbtn" id="btnSet" title="Settings">⚙</button>
+</header>
+
+<div class="machinebar">
+  <label>Machine model<input id="fModel" placeholder="e.g. BIZHUB C360" autocapitalize="characters" autocomplete="off"></label>
+  <label>Error code<input id="fCode" placeholder="e.g. C2557" autocapitalize="characters" autocomplete="off"></label>
+</div>
+
+<div class="quick" id="quick"></div>
+
+<div id="chat"></div>
+
+<div class="composer">
+  <div id="thumbs"></div>
+  <div class="row">
+    <button class="iconbtn" id="btnCam" title="Take photo">📷</button>
+    <button class="iconbtn" id="btnGal" title="Attach image">🖼</button>
+    <textarea id="input" rows="1" placeholder="Describe the issue…"></textarea>
+    <button class="send" id="btnSend" title="Send">➤</button>
+  </div>
+  <input type="file" id="fileCam" accept="image/*" capture="environment" class="hidden">
+  <input type="file" id="fileGal" accept="image/*" multiple class="hidden">
+</div>
+
+<!-- History panel -->
+<div class="panel" id="histPanel">
+  <header>
+    <button class="iconbtn" data-close="histPanel">←</button>
+    <div class="titles"><div class="title">Session history</div></div>
+  </header>
+  <div class="body">
+    <input class="search" id="histSearch" placeholder="Search by machine model, error code or text…">
+    <div id="histList" style="display:flex;flex-direction:column;gap:10px"></div>
+  </div>
+</div>
+
+<!-- Settings panel -->
+<div class="panel" id="setPanel">
+  <header>
+    <button class="iconbtn" data-close="setPanel">←</button>
+    <div class="titles"><div class="title">Settings</div></div>
+  </header>
+  <div class="body">
+    <div class="field">
+      <label>Gemini API key</label>
+      <input id="sKey" type="password" placeholder="Paste key from aistudio.google.com/apikey" autocomplete="off">
+      <small>Stored only on this phone (browser storage). Never put it in the code or upload it to GitHub.</small>
+    </div>
+    <div class="field">
+      <label>Model</label>
+      <input id="sModel" placeholder="gemini-3.8-flash">
+    </div>
+    <div class="field">
+      <label>Company name</label>
+      <input id="sBrand" placeholder="Copytech">
+    </div>
+    <div class="field">
+      <label>App title</label>
+      <input id="sTitle" placeholder="Field Service Assistant">
+    </div>
+    <div class="field">
+      <label>Logo (PNG/SVG/JPG)</label>
+      <input id="sLogo" type="file" accept="image/*">
+      <small>Leave empty to use the placeholder logo.</small>
+    </div>
+    <button class="btn primary" id="sSave">Save</button>
+    <button class="btn" id="sTest">Test connection</button>
+    <div id="sMsg" class="disclaimer"></div>
+    <button class="btn danger" id="sWipe">Delete all saved sessions</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ================= CONFIG ================= */
+const DEFAULTS = {
+  model: 'gemini-3.8-flash',
+  brand: 'Copytech',
+  title: 'Field Service Assistant',
+  logo: 'logo.svg'
+};
+const API = 'https://generativelanguage.googleapis.com/v1beta/models/';
+
+const SYSTEM_PROMPT = `You are a field-service diagnostic assistant for technicians servicing commercial printers, copiers and related office machines.
+The user is an experienced technician working on-site, often with a customer watching. Be fast, precise and practical.
+
+Rules:
+- If the machine make/model or error code is missing and it matters, ask for it in one short line, then still give the most likely general guidance.
+- Never invent error codes, part numbers or menu paths. If you are not sure, say so and say what to check in the service manual or with the manufacturer's support.
+- Mention hot (fuser) and high-voltage hazards, and power-off/unplug steps, whenever relevant.
+- When analysing a photo, say what you can actually see, and what you cannot tell from the image.
+
+Format every answer with these markdown sections, skipping any that are not relevant:
+## Summary
+(one or two lines)
+## Likely causes
+(ranked list)
+## Steps
+(numbered, short)
+## Parts
+(part names, consumables, typical part numbers only if you are sure)
+## Safety
+(only if relevant)
+Keep it concise. Write error codes in backticks.`;
+
+const QUICK = [
+  { label: 'Look up Error Code', text: m => `Look up error code ${m.code || '[code]'} on ${m.model || '[machine model]'}. What does it mean, what causes it, and how do I fix it?`, needs: 'code' },
+  { label: 'Image Quality Issue', text: m => `Image quality problem on ${m.model || '[machine model]'}${m.code ? ' (code ' + m.code + ')' : ''}. Symptom: ` },
+  { label: 'Part Identification', text: m => `Identify the part in the attached photo${m.model ? ' (machine: ' + m.model + ')' : ''}. Give its name, function, common failure symptoms and how to confirm it is faulty.` },
+  { label: 'Paper Jam', text: m => `Paper jam on ${m.model || '[machine model]'}${m.code ? ' (code ' + m.code + ')' : ''}. Jam location and symptoms: ` },
+  { label: 'Maintenance / Counters', text: m => `Maintenance on ${m.model || '[machine model]'}: how do I check and reset the maintenance counters / PM kit for: ` },
+  { label: 'Network / Scan Setup', text: m => `Network or scan-to-email/SMB setup problem on ${m.model || '[machine model]'}. Details: ` }
+];
+
+/* ================= SMALL HELPERS ================= */
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v===null? d : v; }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
+};
+const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+const cfg = () => ({
+  key: store.get('gk',''),
+  model: store.get('gm', DEFAULTS.model) || DEFAULTS.model,
+  brand: store.get('gb', DEFAULTS.brand) || DEFAULTS.brand,
+  title: store.get('gt', DEFAULTS.title) || DEFAULTS.title,
+  logo: store.get('gl','') || DEFAULTS.logo
+});
+
+/* ================= INDEXEDDB (sessions) ================= */
+let dbp;
+function db(){
+  if(dbp) return dbp;
+  dbp = new Promise((res, rej) => {
+    const r = indexedDB.open('fsa-db', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('sessions', { keyPath: 'id' });
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+  return dbp;
+}
+async function tx(mode, fn){
+  const d = await db();
+  return new Promise((res, rej) => {
+    const t = d.transaction('sessions', mode);
+    const out = fn(t.objectStore('sessions'));
+    t.oncomplete = () => res(out && out.result !== undefined ? out.result : undefined);
+    t.onerror = () => rej(t.error);
+  });
+}
+const saveSession = s => tx('readwrite', st => st.put(s));
+const deleteSession = id => tx('readwrite', st => st.delete(id));
+const getAllSessions = () => tx('readonly', st => st.getAll());
+const getSession = id => tx('readonly', st => st.get(id));
+const clearSessions = () => tx('readwrite', st => st.clear());
+
+/* ================= STATE ================= */
+let session = newSession();
+let pending = [];       // images waiting to be sent: {data(base64), mime, url}
+let busy = false;
+
+function newSession(){
+  return { id: uid(), created: Date.now(), updated: Date.now(), model: '', code: '', messages: [] };
+}
+
+/* ================= BRANDING ================= */
+function applyBranding(){
+  const c = cfg();
+  [$('hdrLogo'), $('splashLogo')].forEach(i => i.src = c.logo);
+  $('hdrTitle').textContent = `${c.brand} ${c.title}`;
+  $('splashName').textContent = c.brand;
+  $('splashSub').textContent = c.title.toUpperCase();
+  document.title = `${c.brand} ${c.title}`;
+  const ok = !!c.key;
+  $('statusDot').classList.toggle('off', !ok);
+  $('statusText').textContent = ok ? `ONLINE · ${c.model.toUpperCase()}` : 'NO API KEY — OPEN SETTINGS';
+}
+
+/* ================= RENDERING ================= */
+function inline(t){
+  t = esc(t);
+  t = t.replace(/`([^`]+)`/g, '<code>$1</code>');
+  t = t.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+  return t;
+}
+function renderMarkdown(md){
+  // split on "## " headings into cards
+  const parts = md.split(/^##\s+/m);
+  let html = '';
+  const intro = parts.shift().trim();
+  if(intro) html += `<div class="card">${block(intro)}</div>`;
+  parts.forEach(p => {
+    const nl = p.indexOf('\n');
+    const head = (nl < 0 ? p : p.slice(0, nl)).trim();
+    const body = nl < 0 ? '' : p.slice(nl + 1).trim();
+    const k = head.toLowerCase();
+    const cls = k.includes('safety') ? 'warn' : (k.includes('part') ? 'parts' : '');
+    html += `<div class="card ${cls}"><h4>${esc(head)}</h4>${block(body)}</div>`;
+  });
+  return html || `<div class="card">${block(md)}</div>`;
+}
+function block(txt){
+  const lines = txt.split('\n');
+  let out = '', list = null;
+  const close = () => { if(list){ out += `</${list}>`; list = null; } };
+  lines.forEach(l => {
+    let m;
+    if((m = l.match(/^\s*\d+[.)]\s+(.*)/))){ if(list !== 'ol'){ close(); out += '<ol>'; list = 'ol'; } out += `<li>${inline(m[1])}</li>`; }
+    else if((m = l.match(/^\s*[-*•]\s+(.*)/))){ if(list !== 'ul'){ close(); out += '<ul>'; list = 'ul'; } out += `<li>${inline(m[1])}</li>`; }
+    else if(l.trim() === ''){ close(); }
+    else { close(); out += `<p>${inline(l)}</p>`; }
+  });
+  close();
+  return out;
+}
+function addMsgEl(m){
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ' + (m.role === 'user' ? 'user' : 'ai');
+  if(m.role === 'user'){
+    if(m.images && m.images.length){
+      const d = document.createElement('div'); d.className = 'imgs';
+      m.images.forEach(im => { const i = document.createElement('img'); i.src = `data:${im.mime};base64,${im.data}`; d.appendChild(i); });
+      wrap.appendChild(d);
+    }
+    if(m.text){ const b = document.createElement('div'); b.className = 'bubble'; b.textContent = m.text; wrap.appendChild(b); }
+  } else {
+    wrap.innerHTML = renderMarkdown(m.text) + '<div class="disclaimer">AI-GENERATED · VERIFY AGAINST THE SERVICE MANUAL</div>';
+  }
+  $('chat').appendChild(wrap);
+  return wrap;
+}
+function renderChat(){
+  const chat = $('chat'); chat.innerHTML = '';
+  if(!session.messages.length){
+    const c = cfg();
+    chat.innerHTML = `<div class="empty"><b>${esc(c.brand.toUpperCase())} DIAGNOSTICS</b>Enter the machine model and error code above,<br>snap a photo of the error screen or fault area,<br>or tap a quick action.</div>`;
+  } else session.messages.forEach(addMsgEl);
+  chat.scrollTop = chat.scrollHeight;
+}
+function renderThumbs(){
+  const t = $('thumbs'); t.innerHTML = '';
+  pending.forEach((p, i) => {
+    const d = document.createElement('div'); d.className = 't';
+    d.innerHTML = `<img src="${p.url}"><button aria-label="Remove">✕</button>`;
+    d.querySelector('button').onclick = () => { pending.splice(i, 1); renderThumbs(); };
+    t.appendChild(d);
+  });
+}
+
+/* ================= IMAGES ================= */
+function shrink(file, max = 1280, q = 0.72){
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const r = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * r); c.height = Math.round(img.height * r);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      const dataUrl = c.toDataURL('image/jpeg', q);
+      URL.revokeObjectURL(url);
+      res({ mime: 'image/jpeg', data: dataUrl.split(',')[1], url: dataUrl });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Could not read image')); };
+    img.src = url;
+  });
+}
+async function addFiles(files){
+  for(const f of files){
+    if(pending.length >= 4) break;
+    try{ pending.push(await shrink(f)); }catch(e){ alert(e.message); }
+  }
+  renderThumbs();
+}
+
+/* ================= GEMINI ================= */
+function buildContents(){
+  return session.messages.map(m => {
+    const parts = [];
+    if(m.role === 'user' && m.images) m.images.forEach(im => parts.push({ inline_data: { mime_type: im.mime, data: im.data } }));
+    parts.push({ text: m.text || '(see image)' });
+    return { role: m.role === 'user' ? 'user' : 'model', parts };
+  });
+}
+async function callGemini(){
+  const c = cfg();
+  if(!c.key) throw new Error('No API key. Open Settings (⚙) and paste your Gemini API key.');
+  const ctx = [];
+  if(session.model) ctx.push('Machine: ' + session.model);
+  if(session.code) ctx.push('Error code: ' + session.code);
+  const sys = SYSTEM_PROMPT + (ctx.length ? '\n\nCurrent job context — ' + ctx.join(' | ') : '');
+  const body = {
+    systemInstruction: { parts: [{ text: sys }] },
+    contents: buildContents(),
+    generationConfig: { maxOutputTokens: 4096 }
+  };
+  const r = await fetch(`${API}${encodeURIComponent(c.model)}:generateContent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': c.key },
+    body: JSON.stringify(body)
+  });
+  const j = await r.json().catch(() => ({}));
+  if(!r.ok){
+    const msg = (j.error && j.error.message) || ('HTTP ' + r.status);
+    if(r.status === 429) throw new Error('Free-tier rate limit reached. Wait a minute and try again.\n' + msg);
+    if(r.status === 400 && /API key/i.test(msg)) throw new Error('API key rejected. Check it in Settings.');
+    if(r.status === 404) throw new Error(`Model "${c.model}" not found for this key. Check the model name in Settings.`);
+    throw new Error(msg);
+  }
+  const cand = j.candidates && j.candidates[0];
+  const text = cand && cand.content && cand.content.parts
+    ? cand.content.parts.filter(p => p.text && !p.thought).map(p => p.text).join('')
+    : '';
+  if(!text){
+    const why = (j.promptFeedback && j.promptFeedback.blockReason) || (cand && cand.finishReason) || 'empty response';
+    throw new Error('No answer returned (' + why + '). Try rephrasing or a clearer photo.');
+  }
+  return text;
+}
+
+/* ================= SEND FLOW ================= */
+async function send(){
+  if(busy) return;
+  const text = $('input').value.trim();
+  if(!text && !pending.length) return;
+  session.model = $('fModel').value.trim();
+  session.code = $('fCode').value.trim();
+
+  const userMsg = { role: 'user', text, images: pending.map(p => ({ mime: p.mime, data: p.data })) };
+  session.messages.push(userMsg);
+  session.updated = Date.now();
+  if(session.messages.length === 1) $('chat').innerHTML = '';
+  addMsgEl(userMsg);
+  $('input').value = ''; autosize(); pending = []; renderThumbs();
+
+  busy = true; $('btnSend').disabled = true;
+  const typing = document.createElement('div');
+  typing.className = 'typing'; typing.innerHTML = '<i></i>ANALYSING…';
+  $('chat').appendChild(typing); $('chat').scrollTop = $('chat').scrollHeight;
+
+  try{
+    const answer = await callGemini();
+    typing.remove();
+    const aiMsg = { role: 'model', text: answer };
+    session.messages.push(aiMsg);
+    addMsgEl(aiMsg);
+  }catch(e){
+    typing.remove();
+    // drop the failed user turn from history so a retry does not duplicate context
+    session.messages.pop();
+    const box = document.createElement('div'); box.className = 'errorbox';
+    box.textContent = '⚠ ' + (e.message || e);
+    $('chat').appendChild(box);
+    // restore the user's input for easy resend
+    $('input').value = text; autosize();
+    pending = userMsg.images.map(im => ({ ...im, url: `data:${im.mime};base64,${im.data}` })); renderThumbs();
+  }finally{
+    busy = false; $('btnSend').disabled = false;
+    if(session.messages.length) await saveSession(session);
+    $('chat').scrollTop = $('chat').scrollHeight;
+  }
+}
+
+/* ================= HISTORY ================= */
+async function openHistory(){
+  $('histPanel').classList.add('open');
+  await renderHistory();
+}
+async function renderHistory(){
+  const q = $('histSearch').value.trim().toLowerCase();
+  let all = (await getAllSessions()).sort((a, b) => b.updated - a.updated);
+  if(q) all = all.filter(s => (s.model + ' ' + s.code + ' ' + s.messages.map(m => m.text).join(' ')).toLowerCase().includes(q));
+  const list = $('histList'); list.innerHTML = '';
+  if(!all.length){ list.innerHTML = '<div class="empty">No saved sessions.</div>'; return; }
+  all.forEach(s => {
+    const first = (s.messages.find(m => m.role === 'user') || {}).text || '(photo)';
+    const title = [s.model || 'UNKNOWN MACHINE', s.code].filter(Boolean).join(' · ');
+    const el = document.createElement('div'); el.className = 'sess';
+    el.innerHTML = `<div class="info"><div class="t">${esc(title)}</div><div class="s">${esc(first)}</div>
+      <div class="d">${new Date(s.updated).toLocaleString()} · ${s.messages.length} msgs</div></div>
+      <button class="del" aria-label="Delete">🗑</button>`;
+    el.querySelector('.info').onclick = () => loadSession(s.id);
+    el.querySelector('.del').onclick = async () => { if(confirm('Delete this session?')){ await deleteSession(s.id); renderHistory(); } };
+    list.appendChild(el);
+  });
+}
+async function loadSession(id){
+  const s = await getSession(id);
+  if(!s) return;
+  session = s;
+  $('fModel').value = s.model || ''; $('fCode').value = s.code || '';
+  renderChat();
+  $('histPanel').classList.remove('open');
+}
+function startNew(){
+  if(busy) return;
+  session = newSession(); pending = []; renderThumbs();
+  $('fModel').value = ''; $('fCode').value = ''; $('input').value = ''; autosize();
+  renderChat();
+}
+
+/* ================= SETTINGS ================= */
+function openSettings(){
+  const c = cfg();
+  $('sKey').value = c.key; $('sModel').value = c.model; $('sBrand').value = c.brand; $('sTitle').value = c.title;
+  $('sMsg').textContent = '';
+  $('setPanel').classList.add('open');
+}
+async function saveSettings(){
+  store.set('gk', $('sKey').value.trim());
+  store.set('gm', $('sModel').value.trim() || DEFAULTS.model);
+  store.set('gb', $('sBrand').value.trim() || DEFAULTS.brand);
+  store.set('gt', $('sTitle').value.trim() || DEFAULTS.title);
+  const f = $('sLogo').files[0];
+  if(f){
+    try{
+      const small = await shrink(f, 256, 0.9);
+      // keep PNG transparency for small logos where possible
+      store.set('gl', f.type === 'image/svg+xml' ? await fileToDataUrl(f) : small.url);
+    }catch(e){ $('sMsg').textContent = 'Logo failed: ' + e.message; return; }
+  }
+  applyBranding(); renderChat();
+  $('sMsg').textContent = 'Saved.';
+}
+function fileToDataUrl(f){ return new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(f); }); }
+async function testConnection(){
+  await saveSettings();
+  const c = cfg();
+  $('sMsg').textContent = 'Testing…';
+  try{
+    const r = await fetch(`${API}${encodeURIComponent(c.model)}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': c.key },
+      body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Reply with the single word: ready' }] }], generationConfig: { maxOutputTokens: 256 } })
+    });
+    const j = await r.json().catch(() => ({}));
+    $('sMsg').textContent = r.ok ? '✔ Connected to ' + c.model : '✖ ' + ((j.error && j.error.message) || 'HTTP ' + r.status);
+  }catch(e){ $('sMsg').textContent = '✖ ' + e.message; }
+}
+
+/* ================= UI WIRING ================= */
+function autosize(){
+  const t = $('input'); t.style.height = 'auto'; t.style.height = Math.min(120, t.scrollHeight) + 'px';
+}
+function buildQuick(){
+  const q = $('quick');
+  QUICK.forEach(a => {
+    const b = document.createElement('button'); b.textContent = a.label;
+    b.onclick = () => {
+      const m = { model: $('fModel').value.trim(), code: $('fCode').value.trim() };
+      if(a.needs === 'code' && !m.code){ $('fCode').focus(); return; }
+      $('input').value = a.text(m); autosize(); $('input').focus();
+      const v = $('input').value; $('input').setSelectionRange(v.length, v.length);
+      if(a.label === 'Look up Error Code') send();
+    };
+    q.appendChild(b);
+  });
+}
+
+$('btnSend').onclick = send;
+$('input').addEventListener('input', autosize);
+$('input').addEventListener('keydown', e => { if(e.key === 'Enter' && !e.shiftKey && window.innerWidth > 700){ e.preventDefault(); send(); } });
+$('btnCam').onclick = () => $('fileCam').click();
+$('btnGal').onclick = () => $('fileGal').click();
+$('fileCam').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
+$('fileGal').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
+$('btnNew').onclick = startNew;
+$('btnHist').onclick = openHistory;
+$('btnSet').onclick = openSettings;
+$('histSearch').oninput = renderHistory;
+document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => $(b.dataset.close).classList.remove('open'));
+$('sSave').onclick = saveSettings;
+$('sTest').onclick = testConnection;
+$('sWipe').onclick = async () => { if(confirm('Delete ALL saved sessions on this phone?')){ await clearSessions(); startNew(); renderHistory(); } };
+
+/* ================= INIT ================= */
+applyBranding();
+buildQuick();
+renderChat();
+setTimeout(() => $('splash').classList.add('hide'), 1300);
+if(!cfg().key) setTimeout(openSettings, 1500);
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(() => {}); }
+</script>
+</body>
+</html>
